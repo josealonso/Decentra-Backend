@@ -24,13 +24,92 @@
 
 `Kali` is a protocol for on-chain orgs inspired by [Compound](https://github.com/compound-finance/compound-protocol/tree/master/contracts/Governance) and [Moloch DAO](https://github.com/MolochVentures/moloch) governance. The smart contract code is _simple_ to make it easier to read and secure assets on (less code, less to break). For example, Kali reduces Comp-style governance into a single contract, and can support extensions to add contracts as apps, such as crowdsales and redemptions against pooled funds. Kali contracts are further optimized for gas efficiency and functions are written to be easily adapted via modules through overrides.
 
+## Additional comments for Decentra
+
+- About the ERC20 contracts
+The two contracts are already deployed. When a new ERC20 has to be created, the `KaliERC20factory` factory contract deploys a copy of the `KaliERC20` contract, which is the DAO token.
+```
+  kaliERC20 = KaliERC20(_cloneAsMinimalProxy(erc20Master, name_));
+        
+        kaliERC20.init(
+            name_,
+            symbol_,
+            details_,
+            accounts_,
+            amounts_,
+            paused_,
+            owner_
+        );
+```
+
+The length of the `accounts_` array below is equal to the number of DAO participants. Each element of the `amount_` array indicates how many DAO tokens are minted for each participant.
+
+```
+for (uint256 i; i < accounts_.length; i++) {
+                _mint(accounts_[i], amounts_[i]);
+}
+```
+
+It happens something similar with `KaliDAO` and `KaliDAOFactory` contracts. The difference is that it is an ERC20 token with all the functionalities for voting, delegating votes
+
+- About the ERC721 contracts
+This is more simple. `KaliNFT` is the NFT contract. It imports a custom `ERC721` contract just to keep the first contract small.
+
+- About the ERC1155 contract
+This standard allows to mint both fungible and non-fungible tokens in the same contract. Instead of deploying a new contract for each token type, a single ERC1155 token contract can hold the entire system state, reducing deployment costs and complexity.
+But it's probably unused, because it seems to be incomplete.
+
+- Extensions
+It is well explained at the bottom by Kali's team.
+
+- Calling Solidity functions from the frontend
+When calling Solidity functions, *ethers* and *web3* libraries are used in many occassions. 
+But sometimes they are called using these hooks from the `wagmi` library: `useContractWrite` when writing to the blockchain and `useContractRead` when reading from the blockchain.
+
+```
+const { data, isLoading, writeAsync } = useContractWrite(
+    {
+      addressOrName: daoAddress ?? AddressZero,
+      contractInterface: DAO_ABI,
+    },
+    'vote',     // Solidity function name
+    {
+      onSuccess() {
+        console.log('vote', data)
+      },
+    },
+  )
+
+(extract from *components/dao-dashboard/proposal/vote/index.js*)
+```
+
+The **data** field contains the transaction response.
+Wagmi hooks are more clear in the latest version:
+```
+const { config } = usePrepareContractWrite({
+    addressOrName: daoAddress,
+    contractInterface: DAO_ABI,
+    functionName: 'feed',
+  })
+  const { data, isLoading, isSuccess, write } = useContractWrite(config)
+```
+
+Other wagmi hooks are widely used in this project to manage the wallet connection and ensure the wallet is connected to the desired chain.
+
+
+- Retrieving data fom the blockchain
+
+
+Author: [JR](https://github.com/josealonso)
+
+
 ## Designed for Legal [DAC](https://lawbitrage.typepad.com/blog/2015/02/empowering-distributed-autonomous-companies.html)
 
 Kali is built for on-chain companies and funds. Proposals are broken out into a variety of types that each can have their own governance settings, such as simple/super majority and quorum requirements. Further, Kali supports hashing and amending docs from deployment and through proposals, providing a hook to wrap organizations into legal templates to rationalize membership rules and liabilities. [Legal forms](https://github.com/kalidao/kali-legal) are maintained as open source goods by [LexDAO](https://twitter.com/lex_DAO) legal engineers. Incorporation, and full-service legal engineering support is also being integrated into an MVP UI to allow Kali users to solve their org painpoints quickly and cheaply (stay tuned).
 
 ## Token Voting, Delegation & MetaTX
 
-Kali tokens ([`KaliDAOtoken`](https://github.com/lexDAO/Kali/blob/main/contracts/KaliDAOtoken.sol)) represent voting stakes, and can be launched as transferable or non-transferable, with such settings being updateable via `PAUSE` proposal (see below). This allows for DACs to launch with closed membership (similar to Moloch-style 'clubs') but still retain the option to open their seats to the public. This configurability, in addition to appealing to different deployer preferences, can allow orgs to plan around compliance objectives.
+Kali tokens ([`KaliDAOtoken`](https://github.com/lexDAO/Kali/blob/main/contracts/KaliDAOtoken.sol)) represent voting stakes, and can be launched as transferable or non-transferable, with such settings being updateable via `PAUSE` proposal (see below). This allows for DAOs to launch with closed membership (similar to Moloch-style 'clubs') but still retain the option to open their seats to the public. This configurability, in addition to appealing to different deployer preferences, can allow orgs to plan around compliance objectives.
 
 Voting weight can also be delegated, and such weight automatically updates upon token transfers from delegators, incorporating functionality from Comp-style tokens (with an improvement of 'auto delegation' to new accounts to avoid an extra transaction for Kali users).
 
