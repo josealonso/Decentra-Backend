@@ -98,7 +98,51 @@ Other wagmi hooks are widely used in this project to manage the wallet connectio
 
 
 - Retrieving data fom the blockchain
+We need to keep track of the currently active DAOs and its attributes, such as name, members or token symbol. 
+Notice that only event names and event parameters are stored on the blockchain. It's a very restricted database.  
 
+The Graph is an indexer and decentralized query protocol for the blockchain. It can track events being emitted in real time, transform that data, and make it available through a simple GraphQL API. 
+
+Graph queries are widely used in this project.
+
+- The Kali subgraph is defined on https://thegraph.com/explorer/subgraph?id=C72f3Fiy2C8n1utYM1mo34pLaETVmRabqoDSdDSjpNyt&view=Overview
+- It has six entity types: DAO, Token, Member, Proposal, Vote and Delegate.
+- All the database queries are inside the `graph` directory:
+
+```
+export const ALL_DAOS = gql`
+  query allDaosQuery {
+    daos {
+      id        // dao attribute
+      token {   // dao attribute 
+        name    // token attribute
+      }
+      members { // dao attribute
+        id      // members attribute
+      }
+    }
+  }
+`
+(extract from *graph/dao-queries.js*)
+```
+
+This graph queries are used in many components, for example
+
+```
+import { getMembers } from '../../../../graph/queries'
+.......
+.......
+  useEffect(() => {
+      let mounted = true
+      const fetchMembers = async () => {
+        const result = await getMembers(Number(daoChain), daoAddress)
+        setMembers(result?.data?.daos?.[0])
+      }
+
+(extract from components/dao-dashboard/home/sidebar/Profile.js)
+```
+
+- If bigger data (posts, images and so on) has to be stored in a decentralized way, the most matured database is **Ceramic**.
 
 Author: [JR](https://github.com/josealonso)
 
